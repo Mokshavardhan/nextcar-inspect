@@ -35,12 +35,20 @@ function getRatingColors(rating: string) {
   }
 }
 
-async function normalizeImageForPdf(storagePath: string): Promise<Buffer | null> {
+async function normalizeImageForPdf(media: {
+  storagePath: string;
+  data?: Uint8Array | Buffer | null;
+}): Promise<Buffer | null> {
   try {
-    const absPath = path.isAbsolute(storagePath)
-      ? storagePath
-      : path.join(process.cwd(), storagePath);
-    const raw = await fs.readFile(absPath);
+    let raw: Buffer;
+    if (media.data && media.data.length > 0) {
+      raw = Buffer.from(media.data);
+    } else {
+      const absPath = path.isAbsolute(media.storagePath)
+        ? media.storagePath
+        : path.join(process.cwd(), media.storagePath);
+      raw = await fs.readFile(absPath);
+    }
     try {
       const sharpMod = await import("sharp");
       const sharpFn = sharpMod.default;
@@ -165,7 +173,7 @@ export async function generateInspectionReportPdf(params: {
   }> = [];
 
   for (const photo of photoMedia) {
-    const buf = await normalizeImageForPdf(photo.storagePath);
+    const buf = await normalizeImageForPdf(photo);
     if (buf) {
       normalizedPhotos.push({
         buffer: buf,
@@ -644,11 +652,14 @@ export async function generateInspectionReportPdf(params: {
     doc.end();
   });
 
-  const reportsDir = path.join(process.cwd(), "uploads", "reports");
-  await fs.mkdir(reportsDir, { recursive: true });
   const relPath = path.join("uploads", "reports", `${params.reportNumber}.pdf`);
-  const absPath = path.join(process.cwd(), relPath);
-  await fs.writeFile(absPath, pdfBuffer);
+  try {
+    const reportsDir = path.join(process.cwd(), "uploads", "reports");
+    await fs.mkdir(reportsDir, { recursive: true });
+    await fs.writeFile(path.join(process.cwd(), relPath), pdfBuffer);
+  } catch {
+    // Serverless environments (e.g. Vercel) have read-only root fs; report regenerates from DB cleanly
+  }
 
   return {
     filePath: relPath,

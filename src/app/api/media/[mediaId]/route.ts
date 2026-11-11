@@ -49,10 +49,15 @@ export async function GET(
   }
 
   try {
-    const absPath = path.isAbsolute(access.media.storagePath)
-      ? access.media.storagePath
-      : path.join(process.cwd(), access.media.storagePath);
-    const buffer = await fs.readFile(absPath);
+    let buffer: Buffer;
+    if (access.media.data && access.media.data.length > 0) {
+      buffer = Buffer.from(access.media.data);
+    } else {
+      const absPath = path.isAbsolute(access.media.storagePath)
+        ? access.media.storagePath
+        : path.join(process.cwd(), access.media.storagePath);
+      buffer = await fs.readFile(absPath);
+    }
 
     return new NextResponse(new Uint8Array(buffer), {
       headers: {

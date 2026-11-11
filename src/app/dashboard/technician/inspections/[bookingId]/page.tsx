@@ -27,7 +27,17 @@ export default async function TechnicianInspectionDetailPage({
         inspection: {
           include: {
             responses: true,
-            media: { orderBy: { createdAt: "asc" } },
+            media: {
+              orderBy: { createdAt: "asc" },
+              select: {
+                id: true,
+                mediaType: true,
+                originalName: true,
+                mimeType: true,
+                categoryTag: true,
+                caption: true,
+              },
+            },
           },
         },
       },

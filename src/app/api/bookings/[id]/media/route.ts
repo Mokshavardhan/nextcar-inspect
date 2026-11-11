@@ -71,7 +71,7 @@ export async function POST(
       }));
 
     const uploadDir = path.join(process.cwd(), "uploads", "inspections", bookingId);
-    await fs.mkdir(uploadDir, { recursive: true });
+    await fs.mkdir(uploadDir, { recursive: true }).catch(() => null);
 
     const createdMedia = [];
 
@@ -83,13 +83,30 @@ export async function POST(
         );
       }
 
-      const mime = file.type || "application/octet-stream";
+      let mime = file.type || "application/octet-stream";
       const validSet = mediaType === "PHOTO" ? ALLOWED_IMAGE_TYPES : ALLOWED_DOC_TYPES;
       if (!validSet.has(mime)) {
         return NextResponse.json(
           { error: `Unsupported file type (${mime}) for "${file.name}".` },
           { status: 400 }
         );
+      }
+
+      let bytes: Buffer = Buffer.from(await file.arrayBuffer());
+      if (mediaType === "PHOTO") {
+        try {
+          const sharpMod = await import("sharp");
+          const compressed = await sharpMod
+            .default(bytes)
+            .rotate()
+            .resize({ width: 1400, height: 1050, fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality: 82 })
+            .toBuffer();
+          bytes = Buffer.from(compressed);
+          mime = "image/jpeg";
+        } catch {
+          // retain original bytes if sharp transform skips
+        }
       }
 
       const ext =
@@ -105,8 +122,8 @@ export async function POST(
       const relPath = path.join("uploads", "inspections", bookingId, fileName);
       const absPath = path.join(process.cwd(), relPath);
 
-      const bytes = Buffer.from(await file.arrayBuffer());
-      await fs.writeFile(absPath, bytes);
+      // Write locally when filesystem is writable; serverless deployments read from DB Bytes
+      await fs.writeFile(absPath, bytes).catch(() => null);
 
       const saved = await prisma.inspectionMedia.create({
         data: {
@@ -116,10 +133,25 @@ export async function POST(
           fileName,
           originalName: file.name || fileName,
           mimeType: mime,
-          fileSize: file.size,
+          fileSize: bytes.length,
           storagePath: relPath,
+          data: new Uint8Array(bytes),
           categoryTag,
           caption,
+        },
+        select: {
+          id: true,
+          inspectionId: true,
+          uploadedById: true,
+          mediaType: true,
+          fileName: true,
+          originalName: true,
+          mimeType: true,
+          fileSize: true,
+          storagePath: true,
+          categoryTag: true,
+          caption: true,
+          createdAt: true,
         },
       });
       createdMedia.push(saved);

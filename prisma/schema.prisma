@@ -275,6 +275,7 @@ model InspectionMedia {
   mimeType     String
   fileSize     Int
   storagePath  String
+  data         Bytes?
   categoryTag  String?
   caption      String?
   createdAt    DateTime @default(now())
