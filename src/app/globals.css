@@ -1,0 +1,28 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+:root {
+  --color-navy: #101b35;
+  --color-royal: #2563eb;
+  --color-bg: #f8fafc;
+  --color-white: #ffffff;
+  --color-text: #172033;
+  --color-success: #16a34a;
+  --color-warning: #f59e0b;
+  --color-critical: #dc2626;
+  --font-manrope: "Manrope", "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-inter: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-manrope);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.leaflet-container {
+  font-family: inherit;
+  z-index: 10;
+}

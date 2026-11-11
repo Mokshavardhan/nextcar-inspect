@@ -1,0 +1,376 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String   @id @default(cuid())
+  name           String
+  email          String   @unique
+  passwordHash   String
+  role           String   @default("CUSTOMER") // CUSTOMER | ADMIN | TECHNICIAN
+  phone          String?
+  whatsappNumber String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  customerProfile     CustomerProfile?
+  technicianProfile   TechnicianProfile?
+  vehicles            Vehicle[]
+  bookings            Booking[]              @relation("CustomerBookings")
+  assignmentsCreated  TechnicianAssignment[] @relation("AssignedByAdmin")
+  assignmentsReceived TechnicianAssignment[] @relation("AssignedTechnician")
+  inspections         Inspection[]           @relation("TechnicianInspections")
+  reviews             Inspection[]           @relation("AdminReviews")
+  mediaUploaded       InspectionMedia[]
+  reportsGenerated    InspectionReport[]
+  payments            Payment[]
+  notifications       Notification[]
+  activities          BookingActivity[]
+}
+
+model CustomerProfile {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  address    String?
+  city       String?
+  state      String?
+  postalCode String?
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TechnicianProfile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  employeeCode       String   @unique
+  specialties        String   @default("Full Diagnostics, Engine & Mechanical")
+  serviceCity        String   @default("Metro Area")
+  availabilityStatus String   @default("AVAILABLE") // AVAILABLE | BUSY | OFF_DUTY | ON_LEAVE
+  rating             Float    @default(5.0)
+  bio                String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Vehicle {
+  id                 String   @id @default(cuid())
+  customerId         String
+  vehicleType        String   // CAR | SUV | BIKE
+  manufacturer       String
+  model              String
+  manufacturingYear  Int
+  registrationNumber String
+  fuelType           String
+  transmissionType   String
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  customer User      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+}
+
+model Service {
+  id               String   @id @default(cuid())
+  name             String
+  slug             String   @unique
+  description      String
+  price            Float
+  durationMinutes  Int
+  checklistSummary String   // JSON array of summary bullet strings
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  bookings Booking[]
+}
+
+model AvailabilitySlot {
+  id                 String   @id @default(cuid())
+  label              String
+  startTime          String   // HH:mm
+  endTime            String   // HH:mm
+  maxBookingsPerSlot Int      @default(2)
+  isActive           Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  bookings Booking[]
+}
+
+model BlockedDate {
+  id        String   @id @default(cuid())
+  dateStr   String   @unique // YYYY-MM-DD
+  reason    String?
+  createdAt DateTime @default(now())
+}
+
+model PlatformSettings {
+  id                      String   @id @default("default")
+  companyName             String   @default("NextCar Inspect")
+  companyTagline          String   @default("Precision Automotive Verification & Diagnostics")
+  companyEmail            String   @default("support@nextcarinspect.in")
+  companyPhone            String   @default("+91 80 4123 5500")
+  companyAddress          String   @default("100 Feet Road, Indiranagar, Bengaluru, Karnataka 560038")
+  currency                String   @default("INR")
+  allowFullPayment        Boolean  @default(true)
+  allowAdvancePayment     Boolean  @default(true)
+  advancePercentage       Int      @default(25)
+  allowPayLater           Boolean  @default(true)
+  cancellationWindowHours Int      @default(12)
+  rescheduleWindowHours   Int      @default(12)
+  emailEnabled            Boolean  @default(true)
+  whatsappEnabled         Boolean  @default(true)
+  updatedAt               DateTime @updatedAt
+}
+
+model Booking {
+  id                  String   @id @default(cuid())
+  bookingNumber       String   @unique
+  customerId          String
+  vehicleId           String
+  serviceId           String
+  scheduledDate       String   // YYYY-MM-DD
+  slotId              String
+  timeSlotLabel       String
+  status              String   @default("PENDING")
+  paymentOption       String   @default("FULL") // FULL | ADVANCE | PAY_LATER
+  servicePrice        Float
+  amountToPayNow      Float
+  amountPaid          Float    @default(0)
+  paymentStatus       String   @default("UNPAID") // UNPAID | PARTIALLY_PAID | PAID | REFUNDED | PARTIALLY_REFUNDED
+  address             String
+  city                String
+  state               String
+  postalCode          String
+  latitude            Float?
+  longitude           Float?
+  contactName         String
+  contactEmail        String
+  contactPhone        String
+  contactWhatsapp     String?
+  customerNotes       String?
+  adminNotes          String?
+  cancellationReason  String?
+  rescheduledFromDate String?
+  rescheduledFromSlot String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  customer      User                   @relation("CustomerBookings", fields: [customerId], references: [id])
+  vehicle       Vehicle                @relation(fields: [vehicleId], references: [id])
+  service       Service                @relation(fields: [serviceId], references: [id])
+  slot          AvailabilitySlot       @relation(fields: [slotId], references: [id])
+  assignments   TechnicianAssignment[]
+  inspection    Inspection?
+  report        InspectionReport?
+  payments      Payment[]
+  notifications Notification[]
+  activities    BookingActivity[]
+
+  @@index([scheduledDate, slotId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model TechnicianAssignment {
+  id           String   @id @default(cuid())
+  bookingId    String
+  technicianId String
+  assignedById String
+  assignedAt   DateTime @default(now())
+  isActive     Boolean  @default(true)
+  notes        String?
+
+  booking    Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  technician User    @relation("AssignedTechnician", fields: [technicianId], references: [id])
+  assignedBy User    @relation("AssignedByAdmin", fields: [assignedById], references: [id])
+
+  @@index([bookingId, isActive])
+  @@index([technicianId, isActive])
+}
+
+model Inspection {
+  id               String    @id @default(cuid())
+  bookingId        String    @unique
+  technicianId     String
+  overallCondition String?   // GOOD | NEEDS_ATTENTION | CRITICAL
+  observations     String?
+  comments         String?
+  criticalIssues   String?
+  recommendations  String?
+  finalAssessment  String?
+  revisionNotes    String?
+  isDraft          Boolean   @default(true)
+  submittedAt      DateTime?
+  reviewedById     String?
+  reviewedAt       DateTime?
+  approvedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  booking    Booking              @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  technician User                 @relation("TechnicianInspections", fields: [technicianId], references: [id])
+  reviewedBy User?                @relation("AdminReviews", fields: [reviewedById], references: [id])
+  responses  InspectionResponse[]
+  media      InspectionMedia[]
+  report     InspectionReport?
+}
+
+model InspectionCategory {
+  id          String                    @id @default(cuid())
+  code        String                    @unique
+  name        String
+  description String?
+  sortOrder   Int                       @default(0)
+  items       InspectionChecklistItem[]
+}
+
+model InspectionChecklistItem {
+  id          String   @id @default(cuid())
+  categoryId  String
+  code        String   @unique
+  label       String
+  description String?
+  sortOrder   Int      @default(0)
+
+  category  InspectionCategory   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  responses InspectionResponse[]
+}
+
+model InspectionResponse {
+  id              String   @id @default(cuid())
+  inspectionId    String
+  checklistItemId String
+  rating          String   // GOOD | NEEDS_ATTENTION | CRITICAL | NOT_APPLICABLE
+  notes           String?
+  updatedAt       DateTime @updatedAt
+
+  inspection    Inspection              @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  checklistItem InspectionChecklistItem @relation(fields: [checklistItemId], references: [id], onDelete: Cascade)
+
+  @@unique([inspectionId, checklistItemId])
+}
+
+model InspectionMedia {
+  id           String   @id @default(cuid())
+  inspectionId String
+  uploadedById String
+  mediaType    String   // PHOTO | DOCUMENT
+  fileName     String
+  originalName String
+  mimeType     String
+  fileSize     Int
+  storagePath  String
+  categoryTag  String?
+  caption      String?
+  createdAt    DateTime @default(now())
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  uploadedBy User       @relation(fields: [uploadedById], references: [id])
+}
+
+model InspectionReport {
+  id            String    @id @default(cuid())
+  reportNumber  String    @unique
+  bookingId     String    @unique
+  inspectionId  String    @unique
+  generatedById String
+  isApproved    Boolean   @default(false)
+  approvedAt    DateTime?
+  deliveredAt   DateTime?
+  filePath      String
+  summaryJson   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  booking     Booking    @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  inspection  Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  generatedBy User       @relation(fields: [generatedById], references: [id])
+}
+
+model Payment {
+  id            String    @id @default(cuid())
+  bookingId     String
+  customerId    String
+  transactionId String    @unique
+  gateway       String    // SANDBOX_CARD | STRIPE | PAY_LATER
+  paymentMode   String    // FULL | ADVANCE | BALANCE
+  amount        Float
+  currency      String    @default("INR")
+  status        String    @default("PENDING") // PENDING | PAID | FAILED | REFUNDED | PARTIALLY_REFUNDED
+  refundAmount  Float     @default(0)
+  refundReason  String?
+  refundedAt    DateTime?
+  verifiedAt    DateTime?
+  metadata      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  booking  Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  customer User    @relation(fields: [customerId], references: [id])
+
+  @@index([bookingId])
+}
+
+model Notification {
+  id               String   @id @default(cuid())
+  userId           String?
+  bookingId        String?
+  channel          String   // IN_APP | EMAIL | WHATSAPP
+  eventType        String
+  recipientAddress String?
+  subject          String
+  message          String
+  status           String   @default("SENT") // PENDING | SENT | SIMULATED | FAILED
+  isRead           Boolean  @default(false)
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+}
+
+model BookingActivity {
+  id         String   @id @default(cuid())
+  bookingId  String
+  actorId    String?
+  actorRole  String
+  action     String
+  fromStatus String?
+  toStatus   String?
+  details    String?
+  createdAt  DateTime @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  actor   User?   @relation(fields: [actorId], references: [id])
+
+  @@index([bookingId, createdAt])
+}
+
+model ContactInquiry {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String?
+  subject   String
+  message   String
+  status    String   @default("NEW") // NEW | RESOLVED
+  createdAt DateTime @default(now())
+}
+
