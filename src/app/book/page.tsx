@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { loadPublicPlatformData } from "@/lib/public-data";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { BookingWizard } from "@/components/booking/BookingWizard";
@@ -8,25 +9,19 @@ import { BookingWizard } from "@/components/booking/BookingWizard";
 export const dynamic = "force-dynamic";
 
 export default async function BookInspectionPage() {
-  const [services, settings, currentUser] = await Promise.all([
-    prisma.service.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
-    prisma.platformSettings.upsert({
-      where: { id: "default" },
-      update: {},
-      create: { id: "default" },
-    }),
+  const [{ services, settings }, currentUser] = await Promise.all([
+    loadPublicPlatformData(),
     getCurrentUser(),
   ]);
 
   const savedVehicles =
     currentUser && currentUser.role === "CUSTOMER"
-      ? await prisma.vehicle.findMany({
-          where: { customerId: currentUser.id },
-          orderBy: { createdAt: "desc" },
-        })
+      ? await prisma.vehicle
+          .findMany({
+            where: { customerId: currentUser.id },
+            orderBy: { createdAt: "desc" },
+          })
+          .catch(() => [])
       : [];
 
   return (

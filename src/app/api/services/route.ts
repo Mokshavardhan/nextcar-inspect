@@ -4,21 +4,29 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser, requireApiUser } from "@/lib/auth";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const includeAll = searchParams.get("all") === "true";
+  try {
+    const { searchParams } = new URL(request.url);
+    const includeAll = searchParams.get("all") === "true";
 
-  let showAll = false;
-  if (includeAll) {
-    const user = await getCurrentUser();
-    if (user?.role === "ADMIN") showAll = true;
+    let showAll = false;
+    if (includeAll) {
+      const user = await getCurrentUser();
+      if (user?.role === "ADMIN") showAll = true;
+    }
+
+    const services = await prisma.service.findMany({
+      where: showAll ? {} : { isActive: true },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    });
+
+    return NextResponse.json({ services });
+  } catch (err) {
+    console.error("GET /api/services error:", err);
+    return NextResponse.json(
+      { error: "Failed to load services from database." },
+      { status: 500 }
+    );
   }
-
-  const services = await prisma.service.findMany({
-    where: showAll ? {} : { isActive: true },
-    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-  });
-
-  return NextResponse.json({ services });
 }
 
 const createServiceSchema = z.object({

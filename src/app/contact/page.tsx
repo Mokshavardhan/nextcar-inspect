@@ -1,7 +1,7 @@
 import React from "react";
 import { Mail, MapPin, Phone, Clock } from "lucide-react";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { loadPublicPlatformData } from "@/lib/public-data";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { ContactForm } from "@/components/contact/ContactForm";
@@ -9,13 +9,9 @@ import { ContactForm } from "@/components/contact/ContactForm";
 export const dynamic = "force-dynamic";
 
 export default async function ContactPage() {
-  const [currentUser, settings] = await Promise.all([
+  const [currentUser, { settings }] = await Promise.all([
     getCurrentUser(),
-    prisma.platformSettings.upsert({
-      where: { id: "default" },
-      update: {},
-      create: { id: "default" },
-    }),
+    loadPublicPlatformData(),
   ]);
 
   return (

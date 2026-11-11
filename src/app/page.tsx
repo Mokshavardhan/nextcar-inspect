@@ -16,8 +16,8 @@ import {
   ClipboardCheck,
   Award,
 } from "lucide-react";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { loadPublicPlatformData } from "@/lib/public-data";
 import { formatCurrency, parseChecklistSummary } from "@/lib/format";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
@@ -26,17 +26,9 @@ import { FaqAccordion } from "@/components/home/FaqAccordion";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const [services, currentUser, settings] = await Promise.all([
-    prisma.service.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
+  const [{ services, settings, dbConnected }, currentUser] = await Promise.all([
+    loadPublicPlatformData(),
     getCurrentUser(),
-    prisma.platformSettings.upsert({
-      where: { id: "default" },
-      update: {},
-      create: { id: "default" },
-    }),
   ]);
 
   const processSteps = [
@@ -194,6 +186,14 @@ export default async function HomePage() {
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
+
+          {!dbConnected && (
+            <div className="mt-8 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+              Live database packages are temporarily unavailable. Verify <code>DATABASE_URL</code>{" "}
+              (use your Supabase IPv4 Transaction/Session Pooler string in serverless deployments)
+              and check <code>/api/health</code>.
+            </div>
+          )}
 
           <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {services.map((service) => {

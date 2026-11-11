@@ -1,8 +1,8 @@
 import React from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Clock, CarFront, ShieldCheck } from "lucide-react";
-import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { loadPublicPlatformData } from "@/lib/public-data";
 import { formatCurrency, parseChecklistSummary } from "@/lib/format";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
@@ -10,17 +10,9 @@ import { SiteFooter } from "@/components/layout/SiteFooter";
 export const dynamic = "force-dynamic";
 
 export default async function ServicesPage() {
-  const [services, currentUser, settings] = await Promise.all([
-    prisma.service.findMany({
-      where: { isActive: true },
-      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-    }),
+  const [{ services, settings }, currentUser] = await Promise.all([
+    loadPublicPlatformData(),
     getCurrentUser(),
-    prisma.platformSettings.upsert({
-      where: { id: "default" },
-      update: {},
-      create: { id: "default" },
-    }),
   ]);
 
   return (
